@@ -14,5 +14,5 @@ RUN apt-get -y update && \
 
 # Libraries
 RUN git clone -b feature/add-docker https://github.com/kishiyamat/interspeech-2021-replication.git
-
+RUN git clone -b feature/add-docker https://github.com/kishiyamat/interspeech-2021-replication.git
 # Experiment
