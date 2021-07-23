@@ -14,7 +14,7 @@ $ git clone git@github.com:kishiyamat/interspeech-2021-replication.git
 $ cd interspeech-2021-replication
 ```
 
-Run Experiments
+Run the experiments
 
 ```shell
 $ # Local terminal 1 @ interspeech-2021-replication
@@ -27,7 +27,7 @@ $ make exp2     # dupoux et al. 2011
 $ # keep docker running
 ```
 
-Copy Results
+Copy the results
 
 ```shell
 $ # Local terminal 2 @ interspeech-2021-replication
