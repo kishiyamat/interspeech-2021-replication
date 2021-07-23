@@ -12,7 +12,7 @@ RUN apt-get -y update && \
     apt-get install -yq gcc g++ && \
     apt-get install -y r-base
 
-RUN echo "1"
+RUN echo "2"
 # Libraries
 RUN git clone -b feature/add-docker https://github.com/kishiyamat/interspeech-2021-replication.git
 # Experiment
