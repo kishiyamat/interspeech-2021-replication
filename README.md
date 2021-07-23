@@ -2,14 +2,22 @@
 
 ## Prerequisites
 
+- Git
 - Docker
 
 ## How to replicate the results
 
+Clone this repository
+
+```shell
+git clone git@github.com:kishiyamat/interspeech-2021-replication.git
+cd interspeech-2021-replication
+```
+
 Run Experiments
 
 ```shell
-$ # Local terminal 1
+$ # Local terminal 1 @ interspeech-2021-replication
 $ docker build -t kishiyamat/interspeech-2021-replication .
 $ docker run -it --rm kishiyamat/interspeech-2021-replication bash
 $ # Docker terminal
@@ -22,7 +30,7 @@ $ # keep docker running
 Copy Results
 
 ```shell
-$ # Local terminal 2
+$ # Local terminal 2 @ interspeech-2021-replication
 $ docker ps
 CONTAINER ID        IMAGE                                     COMMAND             CREATED             STATUS              PORTS               NAMES
 7609212cd78a        kishiyamat/interspeech-2021-replication   "bash"              9 minutes ago       Up 9 minutes        8787/tcp            sleepy_bell
