@@ -1,0 +1,324 @@
+---
+title: "Experiment 2"
+output: html_notebook
+---
+
+In experiment 2 the following factors were controlled: 
+
+* Model: jpn, bpt
+* Algorithm: viterbi, naive_bayes
+* N_parallel: 1,2,3
+* co-articulation: "i", "u", "natural"
+
+The standard deviations are given.
+
+```{r}
+library(dplyr)
+library(grid)
+library(ggplot2)
+library(gridExtra)
+library(forcats)
+
+source("../src/hmm.R")
+source("../src/experiment-2.R")
+print(getwd())
+```
+
+
+```{r}
+exp_list <- expand.grid(
+  algorithms = c("viterbi", "naive_bayes"),
+  n_parallel = c(1, 2, 3),
+  lang = c("jpn-u", "bpt-i"),
+  bias = c(0, 1, 2), # jpnならu, bptならiにバイアスをかける
+  sds = c(0, 25, 50),
+  coart = c("u", "i", "natural")
+) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>% # naive_bayes doesn't need "paralell"
+  mutate(coart = as.character(coart))
+```
+
+```{r}
+trial <- 1:100
+n_trial <- length(trial)
+
+trials <- c()
+preds <- c()
+epentheses <- c()
+
+for (t in trial) {
+  for (i in 1:nrow(exp_list)) {
+    settings <- exp_list[i, ]
+    model_params <- list(
+      algorithm = settings$algorithms,
+      n_parallel = settings$n_parallel,
+      lang = settings$lang,
+      bias = settings$bias,
+      sds = settings$sds,
+      coart = settings$coart
+    )
+    exp_i <- Experiment_2$new(params = model_params, log_dir = "../artifact")
+    exp_i$run()
+    preds <- c(preds, exp_i$prediction)
+    epentheses <- c(epentheses, exp_i$epenthesis)
+    trials <- c(trials, t)
+  }
+}
+
+results = data.frame(algorithms= rep(exp_list$algorithms,n_trial),
+                     lang= rep(exp_list$lang,n_trial),
+                     n_parallel= rep(exp_list$n_parallel,n_trial),
+                     bias = rep(exp_list$bias, n_trial),
+                     sds = rep(exp_list$sds, n_trial),
+                     coart = rep(exp_list$coart, n_trial)
+                     )
+
+results$epenthesis = epentheses
+results$pred = preds
+results$trial = trials
+results
+```
+
+### Group by predicted strings
+
+```{r}
+epenthesis_count = results %>%
+  filter(n_parallel<=2) %>% 
+  filter(!(algorithms=='naive_bayes' & n_parallel>=2)) %>% 
+  filter(sds==25) %>% 
+  filter(bias==1) %>% 
+  # filter(coart=="i") %>% 
+    mutate(condition = paste(algorithms, n_parallel)) # %>% 
+
+more_than_five = epenthesis_count %>% group_by(pred, condition) %>% summarise(count = n()) %>% 
+  filter(count>10) %>% ungroup %>% select(pred) %>% unlist
+more_than_five
+epenthesis_count
+
+# epenthesis_count
+count_plot =
+  epenthesis_count %>% filter(pred %in% more_than_five) %>%
+  mutate(Language=fct_recode(lang, "BP"='bpt-i', "JPN"="jpn-u")) %>% 
+  mutate(Language=factor(.$Language, levels=c("BP", "JPN"))) %>% 
+  ggplot(aes(y=pred, fill=Language, color=Language)) +
+    theme_bw()  +
+    scale_fill_manual(values = c("gray", "white")) +
+  # facet_wrap(.~condition) +
+  facet_grid(coart~condition) +
+  geom_bar(colour="black", size=0.2, position = position_stack(reverse = TRUE)) +
+    theme(legend.position="top") +
+    theme(axis.title.y=element_blank(),
+          axis.title.x=element_blank()) +
+   theme(axis.text=element_text(size=8),
+         axis.title=element_text(size=10,face="bold"),
+         strip.text.x = element_text(size = 8),
+         axis.title.x=element_blank())
+
+count_plot
+ggsave(file="../artifact/count_plot_i.pdf", count_plot, width = 8, height = 8, units = "cm")
+```
+
+```{r}
+results %>% 
+  mutate(condition = paste(algorithms, n_parallel)) %>% 
+  filter(bias==1) %>% 
+  filter(sds==25) %>% 
+  ggplot(aes(y=epenthesis, fill=lang, color=lang)) +
+    theme_bw()  +
+    scale_fill_manual(values = c("gray", "white")) +
+  facet_wrap(.~condition) +
+  geom_bar(colour="black", size=0.2, position = position_stack(reverse = TRUE)) +
+    theme(legend.position="top") +
+    theme(axis.title.y=element_blank(),
+          axis.title.x=element_blank()) +
+   theme(axis.text=element_text(size=8),
+         axis.title=element_text(size=10,face="bold"),
+         strip.text.x = element_text(size = 8),
+         axis.title.x=element_blank())
+
+# こんどは/i/を挿入してる。
+# results %>% 
+#   mutate(condition = paste(algorithms, n_parallel)) %>% 
+#   filter(bias==1) %>% 
+#   filter(sds==25) %>% 
+#   print()
+
+```
+
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(grid)
+library(forcats)
+
+# i-uの計算
+tmp =   results %>%
+  mutate(condition = paste(algorithms, n_parallel)) %>% 
+  filter(epenthesis %in% c("u", "i")) %>% 
+  group_by(coart, lang, condition, sds, bias) %>% 
+  count(epenthesis)  %>% 
+  pivot_wider(names_from = epenthesis, values_from = n, values_fill = 0) %>% 
+  mutate(hyperparams = paste(as.character(sds), as.character(bias))) %>% 
+  mutate(i_u_sum = i+u) %>% 
+  mutate(i_u_ratio = (i-u)/i_u_sum) %>%  # make this value between -1--1
+  mutate(coart=as.factor(coart)) %>%  # factor扱いに
+  mutate(coarticulation=fct_recode(coart, "/i/"='i',"natural"="natural", "/u/"="u")) %>% 
+  rename(Language=lang) %>%
+  mutate(Language = as.factor(Language))
+
+tmp$coarticulation <- factor(tmp$coarticulation, levels = c("/i/", "natural", "/u/"))
+tmp$Language = factor(tmp$Language, levels=c("bpt-i", "jpn-u"))
+tmp
+```
+
+```{r}
+results_stats2 =  results %>%
+  filter(sds  == 25) %>%  filter(bias ==1) %>% 
+  mutate(condition = paste(algorithms, n_parallel)) %>% 
+  filter(epenthesis %in% c("i", "u"))  %>% 
+  mutate(i_u = epenthesis=="i") %>% 
+  select(c(i_u, condition, coart, lang)) %>% 
+  mutate(coart_num = case_when(coart=="i"~1, coart=="natural"~0, coart=="u"~-1))
+
+algorithms = c("naive_bayes 1", "viterbi 1", "viterbi 2")
+save_glm = function(algorithm){
+  sink(paste0("../artifact/",algorithm,"-glm-exp2.txt"))
+  model = glm(i_u ~ coart_num*lang, results_stats2, subset=condition==algorithm, family=binomial)
+  print(summary(model))
+  sink()
+}
+sapply(algorithms, save_glm)
+```
+
+```{r}
+# viterbi 1/nb: no epenthesis
+# sd helps
+
+kishiyama2021_2 = tmp %>%
+  # filter(condition=="viterbi 2") %>%  # use viterbi 2 to see the best sd
+  filter(sds  == 25) %>% 
+  filter(bias ==1) %>% 
+  ggplot(aes(x = coarticulation, y = i_u_ratio, fill = Language, group = Language, shape = Language)) +
+  facet_wrap(.~condition, nrow = 2) +
+  # facet_grid(bias~sds) + 
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  ylim(-1, 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+   theme(legend.position = "none",
+          axis.title.y=element_blank()) +
+   theme(axis.text=element_text(size=9),
+         axis.title=element_text(size=12,face="bold"),
+         strip.text.x = element_text(size = 9),
+         axis.title.x=element_blank())
+kishiyama2021_2 
+```
+
+```{r}
+kishiyama2021_2_sd = tmp %>%
+  filter(condition=="viterbi 2") %>%  # viterbi 2 であたりをつける
+  filter(sds %in% c(0, 25)) %>%  # viterbi 2 であたりをつける
+  filter(bias %in%c(0, 1)) %>%  # viterbi 2 であたりをつける
+  ggplot(aes(x = coarticulation, y = i_u_ratio, fill = Language, group = Language, shape = Language)) +
+  facet_grid(bias~sds) + 
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  ylim(-1, 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+   theme(legend.position = "none",
+          axis.title.y=element_blank()) +
+   theme(axis.text=element_text(size=9),
+         axis.title=element_text(size=12,face="bold"),
+         strip.text.x = element_text(size = 9),
+         axis.title.x=element_blank())
+kishiyama2021_2_sd 
+```
+
+```{r}
+# これは不要だろうなぁ
+tmp %>%
+  filter(sds==25) %>%  # viterbi 2 であたりをつける
+  filter(bias==2) %>%  # viterbi 2 であたりをつける
+  ggplot(aes(x = coarticulation, y = i_u_ratio, fill = Language, group = Language, shape = Language)) +
+  facet_wrap(.~condition, nrow = 2) +
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  ylim(-1, 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+   theme(legend.position = "none",
+          axis.title.y=element_blank()) +
+   theme(axis.text=element_text(size=9),
+         axis.title=element_text(size=12,face="bold"),
+         strip.text.x = element_text(size = 9),
+         axis.title.x=element_blank())
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(forcats)
+font <- "HiraKakuPro-W3"
+
+size <- 3
+bp <- c(0.7, 0.6, 0.5)
+jp <- c(0.18, -0.5, -0.5)
+y <- c(bp, jp)
+x <- rep(c("/i/", "natural", "/u/"), 2)
+lang <- c(rep("Brazilian Portuguese", size), rep("Japanese", size))
+data <- data.frame(coarticulation = x, i_u_ratio = y, Language = lang)
+data$coarticulation <- factor(data$coarticulation, levels = c("/i/", "natural", "/u/"))
+
+
+dupoux2011 <- data %>%
+  data.frame(coarticulation = x, i_u_ratio = y, Language = lang) %>%
+  mutate(Language = as.factor(Language)) %>%
+  ggplot(aes(x = coarticulation, y = i_u_ratio, fill = Language, group = Language, shape = Language)) +
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  ylim(-1, 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+  ggtitle("")  +
+  theme(
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  theme(
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 12, face = "bold")
+  )
+
+dupoux2011
+```
+```{r}
+library(ggpubr)
+g = ggarrange(dupoux2011,  kishiyama2021_2, nrow = 2, heights=c(0.35, 0.65), labels = c("(a)","(b)"), vjust = 1.5,
+              font.label = list(size = 10, color = "black", face = "bold", family = NULL))
+g
+ggsave(file="../artifact/dupoux2011.pdf", g, width = 8, height = 8, units = "cm")
+```
+
+## Appendix
+
+```{r}
+library(ggplot2)
+results %>%
+  mutate(condition = paste(algorithms, n_parallel)) %>% 
+   filter(sds==25) %>%
+   filter(bias==0) %>%
+   filter(!is.na(epenthesis)) %>%
+  ggplot(aes(x=epenthesis, color=coart)) +
+  facet_grid(condition~lang) +
+  geom_bar()
+```

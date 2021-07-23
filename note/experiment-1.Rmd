@@ -1,0 +1,308 @@
+---
+title: "Experiment 1"
+output: html_notebook
+---
+
+In experiment 1 the following factors were controlled: 
+
+* Model: jpn, fr
+* Algorithm: viterbi, naive_bayes
+* N_parallel: 1,2,3,4,5
+* U_duration: 0, 1, 2, 3
+
+The standard deviations are given.
+
+```{r}
+library(dplyr)
+library(grid)
+library(ggplot2)
+library(gridExtra)
+library(forcats)
+
+source("../src/hmm.R")
+source("../src/experiment.R")
+print(getwd())
+```
+
+```{r}
+trial <- 1:100
+n_trial <- length(trial)
+
+exp_list <- expand.grid(
+  sd = seq(10, 50, 5),
+  algorithms = c("viterbi", "naive_bayes"),
+  n_parallel = c(1, 2, 3, 4, 5),
+  lang = c("jpn", "fr"),
+  u_duration = c(0, 1, 2) # issue #60
+) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2))
+
+trials <- c()
+epentheses <- c()
+preds <- c()
+trues <- c()
+
+for (t in trial) {
+  for (i in 1:nrow(exp_list)) {
+    settings <- exp_list[i, ]
+    model_params <- list(
+      sd = settings$sd,
+      algorithm = settings$algorithms,
+      n_parallel = settings$n_parallel,
+      lang = settings$lang,
+      u_duration = settings$u_duration
+    )
+    exp_i <- Experiment$new(params = model_params, log_dir = "../log")
+    exp_i$run()
+    preds <- c(preds, exp_i$prediction)
+    epentheses <- c(epentheses, exp_i$prediction == exp_i$evidence)
+    trials <- c(trials, t)
+  }
+}
+
+results <- data.frame(
+  sd = rep(exp_list$sd, n_trial),
+  algorithms = rep(exp_list$algorithms, n_trial),
+  lang = rep(exp_list$lang, n_trial),
+  n_parallel = rep(exp_list$n_parallel, n_trial),
+  u_duration = rep(exp_list$u_duration, n_trial)
+)
+
+results$epenthesis <- epentheses
+results$pred <- preds
+results$true <- trues
+results$trial <- trials
+```
+
+### Group by predicted strings
+
+```{r}
+epenthesis_count <- results %>%
+  filter(n_parallel <= 2) %>%
+  filter(u_duration == 0) %>%
+  # 0
+  mutate(u_duration = as.factor(u_duration)) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>%
+  filter(sd == 25) %>%
+  mutate(condition = paste(algorithms, n_parallel)) # %>%
+# group_by(condition, lang, u_duration, pred) %>% summarise(count = n())
+
+# 予測ごとにカウントして5回以上のもの.
+more_than_five <- epenthesis_count %>%
+  group_by(pred) %>%
+  summarise(count = n()) %>%
+  filter(count > 15) %>%
+  ungroup() %>%
+  select(pred) %>%
+  unlist()
+more_than_five
+
+# epenthesis_count
+count_plot <-
+  epenthesis_count %>%
+  filter(pred %in% more_than_five) %>%
+  mutate(Language = fct_recode(lang, French = "fr", Japanese = "jpn")) %>%
+  mutate(Language = factor(.$Language, levels = c("French", "Japanese"))) %>%
+  # tmp.df$lang = factor(tmp.df$lang, levels=c("French", "Japanese"))
+  ggplot(aes(y = pred, fill = Language, color = Language)) +
+  theme_bw() +
+  scale_fill_manual(values = c("gray", "white")) +
+  facet_wrap(. ~ condition) +
+  geom_bar(colour = "black", size = 0.2, position = position_stack(reverse = TRUE)) +
+  theme(legend.position = "top") +
+  theme(
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  theme(
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 10, face = "bold"),
+    strip.text.x = element_text(size = 8),
+    axis.title.x = element_blank()
+  )
+
+count_plot
+ggsave(file = "../artifact/count_plot.pdf", count_plot, width = 8, height = 6, units = "cm")
+# In viterbi 1, the model follows the phonotactics in such a way that it delete /z/.
+# In viterbi 2, the model follows the phonotactics with the epenthesis.
+# In naive bayes, the model does not follow the phonotactics.
+```
+
+### Stats
+
+```{r}
+results1_stats <- results %>%
+  filter(n_parallel <= 2) %>%
+  mutate(u_duration = u_duration) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>%
+  filter(sd == 25) %>%
+  mutate(condition = paste(algorithms, n_parallel)) %>%
+  mutate(Language = fct_recode(lang, French = "fr", Japanese = "jpn")) %>%
+  mutate(
+    Language = factor(.$Language, levels = c("French", "Japanese")),
+    epenthesis = as.numeric(epenthesis),
+    language_model = algorithms == "viterbi",
+    parallel = n_parallel == 2
+  )
+
+algorithms <- c("naive_bayes 1", "viterbi 1", "viterbi 2")
+save_glm <- function(algorithm) {
+  sink(paste0("../artifact/", algorithm, "-glm.txt"))
+  print(summary(glm(epenthesis ~ Language * u_duration, results1_stats, subset = condition == algorithm, family = binomial)))
+  sink()
+}
+sapply(algorithms, save_glm)
+```
+
+### Caluculate epenthesis-rate
+
+```{r}
+epenthesis_rate <- results %>%
+  group_by(sd, algorithms, lang, n_parallel, u_duration) %>%
+  summarise(epenthesis_rate = mean(epenthesis)) #  %>%
+
+head(epenthesis_rate, 10)
+```
+
+## Figure
+
+1. Dupoux et al. 1999
+1. Simulation
+
+```{r}
+font <- "HiraKakuPro-W3"  # This requires you to some embed fonts.
+
+# Camera ready
+tmp.df <-
+  epenthesis_rate %>%
+  filter(n_parallel <= 3) %>%
+  filter(u_duration <= 2) %>%
+  mutate(u_duration = as.factor(u_duration)) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>%
+  filter(sd == 25) %>%
+  mutate(condition = paste(algorithms, n_parallel)) %>%
+  mutate(epenthesis_rate = epenthesis_rate * 100) %>%
+  mutate(lang = as.factor(lang)) %>%
+  mutate(lang = fct_recode(lang, French = "fr", Japanese = "jpn"))
+
+tmp.df
+
+tmp.df$lang <- factor(tmp.df$lang, levels = c("French", "Japanese"))
+
+kishiyama2021 <- tmp.df %>%
+  ggplot(aes(x = u_duration, y = epenthesis_rate, fill = lang, group = lang, shape = lang)) +
+  facet_wrap(. ~ condition, nrow = 2) +
+  geom_line(aes(linetype = lang)) +
+  geom_point(size = 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) + # 中がそうかどうか
+  scale_fill_manual(values = c("black", "white")) +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank()
+  ) +
+  # ggtitle("")  + # (a) や (b) を置くためのスペース
+  theme(
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 12, face = "bold"),
+    strip.text.x = element_text(size = 9),
+    axis.title.x = element_blank()
+  )
+
+kishiyama2021
+# t+1でtを見て確定させる
+# tの候補で最尤しか残さないと(n_parallel==1)、u->zの択はb->zに消されてしまう。
+# ここの細かい計算をわかりやすくする
+```
+
+```{r}
+size <- 6
+jpn <- c(75, 85, 85, 95, 95, 95)
+fr <- c(10, 20, 45, 80, 93, 97)
+y <- c(jpn, fr)
+x <- rep(c("0", "18", "36", "54", "72", "FULL"), 2)
+lang <- c(rep("jpn", size), rep("fr", size))
+
+dupoux1999 <-
+  data.frame(u_duration = x, epenthesis_rate = y, lang = lang) %>%
+  mutate(lang = as.factor(lang)) %>%
+  mutate(Language = fct_recode(lang, French = "fr", Japanese = "jpn")) %>%
+  ggplot(aes(x = u_duration, y = epenthesis_rate, fill = Language, group = Language, shape = Language)) +
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+  ggtitle("") +
+  theme(
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  theme(
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 12, face = "bold")
+  )
+
+dupoux1999
+```
+
+```{r}
+library(ggpubr)
+g <- ggarrange(dupoux1999, kishiyama2021,
+  nrow = 2, heights = c(0.35, 0.65), labels = c("(a)", "(b)"), vjust = 1.5,
+  font.label = list(size = 10, color = "black", face = "bold", family = NULL)
+)
+ggsave(file = "../artifact/dupoux1999.pdf", g, width = 8, height = 8, units = "cm")
+```
+
+## Appendix
+
+1. Results by standard deviation
+
+```{r}
+epenthesis_rate %>%
+  filter(n_parallel <= 2) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>%
+  mutate(condition = paste(lang, algorithms, n_parallel)) %>%
+  ggplot(aes(x = sd, y = epenthesis_rate, color = condition)) +
+  facet_grid(lang ~ u_duration) +
+  geom_line()
+
+# 30がもっとも近い。
+tmp.df2 <- epenthesis_rate %>%
+  filter(u_duration <= 2) %>%
+  filter(n_parallel <= 2) %>%
+  mutate(u_duration = as.factor(u_duration)) %>%
+  filter(!(algorithms == "naive_bayes" & n_parallel >= 2)) %>%
+  # filter(sd%%3==0) %>%
+  filter(sd %in% c(20, 30, 40)) %>%
+  mutate(condition = paste(algorithms, n_parallel)) %>%
+  mutate(Language = fct_recode(lang, French = "fr", Japanese = "jpn")) %>%
+  mutate(Language = as.factor(Language))
+
+tmp.df2$Language <- factor(tmp.df2$Language, levels = c("French", "Japanese"))
+
+by_sd <- tmp.df2 %>%
+  ggplot(aes(x = u_duration, y = epenthesis_rate, fill = Language, group = Language, shape = Language)) +
+  facet_grid(sd ~ condition) +
+  geom_line(aes(linetype = Language)) +
+  geom_point(size = 1) +
+  theme_bw() +
+  scale_shape_manual(values = c(16, 21)) +
+  scale_fill_manual(values = c("black", "white")) +
+  ggtitle("") +
+  theme(legend.position = "top") +
+  theme(
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  theme(
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 10, face = "bold"),
+    strip.text.x = element_text(size = 8),
+    axis.title.x = element_blank()
+  )
+
+by_sd
+ggsave(file = "../artifact/by_sd.pdf", by_sd, width = 8, height = 8, units = "cm")
+```
