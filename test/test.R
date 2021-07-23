@@ -42,5 +42,5 @@ test_that("naive_bayes", {
 })
 
 test_that("unique seq", {
-  expect_equal(c("e", "b", "u", "z", "o"), unique_seq(test_Z_hat))
+  expect_equal(c("e", "b", "u", "z", "o"), unique_seq(c("e","e","b","b","u", "z", "z","o", "o")))
 })
