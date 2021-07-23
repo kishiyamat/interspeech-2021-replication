@@ -1,6 +1,6 @@
 # interspeech-2021-replication
 
-## Prerequisitee
+## Prerequisites
 
 - Docker
 
@@ -8,7 +8,7 @@
 
 Run Experiments
 
-```
+```shell
 $ # Local terminal 1
 $ docker build -t kishiyamat/interspeech-2021-replication .
 $ docker run -it --rm kishiyamat/interspeech-2021-replication bash
@@ -21,7 +21,7 @@ $ # keep docker running
 
 Copy Results
 
-```
+```shell
 $ # Local terminal 2
 $ docker ps
 CONTAINER ID        IMAGE                                     COMMAND             CREATED             STATUS              PORTS               NAMES
@@ -32,7 +32,7 @@ $ docker cp 7609212cd78a:/opt/app/interspeech-2021-replication/artifact/. artifa
 
 ## Citation
 
-```
+```bibtex
 @inproceedings{kishiyama2021influence,
   author={Takeshi Kishiyama},
   title={The Influence of Parallel Processing on Illusory Vowels},
