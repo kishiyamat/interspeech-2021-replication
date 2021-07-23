@@ -1,5 +1,6 @@
 library(R6)
 library(rlang)
+library(dplyr)
 
 unique_seq <- function(seq) {
   return(rle(seq)$values)

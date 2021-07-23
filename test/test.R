@@ -1,6 +1,6 @@
 library(testthat)
-print(getwd())
-source("../src/hmm.R")
+source("../src/hmm.R")  # test HMM
+
 # TEST DATA
 # categories, priors, A, B
 categories <- unname(unlist(read.table(file = "../data/categories.txt")))
