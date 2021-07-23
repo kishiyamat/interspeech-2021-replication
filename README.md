@@ -10,8 +10,8 @@
 Clone this repository
 
 ```shell
-git clone git@github.com:kishiyamat/interspeech-2021-replication.git
-cd interspeech-2021-replication
+$ git clone git@github.com:kishiyamat/interspeech-2021-replication.git
+$ cd interspeech-2021-replication
 ```
 
 Run Experiments
