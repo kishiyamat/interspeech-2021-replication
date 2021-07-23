@@ -17,4 +17,4 @@ RUN R -e "install.packages('gridExtra', repos = 'http://cran.us.r-project.org')"
 RUN R -e "install.packages('ggpubr', repos = 'http://cran.us.r-project.org')"
 
 # Experiments
-RUN git clone -b feature/add-docker https://github.com/kishiyamat/interspeech-2021-replication.git
+RUN git clone -b main https://github.com/kishiyamat/interspeech-2021-replication.git
