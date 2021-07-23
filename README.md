@@ -34,7 +34,7 @@ $ # Local terminal 2 @ interspeech-2021-replication
 $ docker ps
 CONTAINER ID        IMAGE                                     COMMAND             CREATED             STATUS              PORTS               NAMES
 7609212cd78a        kishiyamat/interspeech-2021-replication   "bash"              9 minutes ago       Up 9 minutes        8787/tcp            sleepy_bell
-$ use CONTAINER ID to find results
+$ # Use CONTAINER ID to find results
 $ docker cp 7609212cd78a:/opt/app/interspeech-2021-replication/artifact/. artifact/
 ```
 
