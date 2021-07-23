@@ -1,6 +1,8 @@
 bash:
-	docker build -t kishiyamat/lsj-162-replication .
-	docker run -it --rm kishiyamat/lsj-162-replication bash
+	docker build -t kishiyamat/interspeech-2021-replication .
+	docker run -it --rm kishiyamat/interspeech-2021-replication bash
+check:
+	cd test/; Rscript test.R
 hypara:
 	cd src; python hyparams.py
 exp1:
