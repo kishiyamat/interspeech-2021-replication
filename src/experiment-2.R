@@ -18,27 +18,26 @@ Experiment_2 <- R6Class("Experiment",
       stopifnot(setequal(names(params), self$param_names))
       stopifnot(params$lang %in% self$lang_names)
       self$log_dir <- log_dir
-      self$model <- self$make_model(params)  # 実験サイクルごとにモデルを作って外部の影響をなくす
+      self$model <- self$make_model(params)  # make model for each trial
       self$obs <- self$make_obs(params)
       # self$evidence <- 'ebuzo'  # epenthesis ならこっちだけでいい
     },
     make_model = function(params){
-      categories <- unname(unlist(read.table(file = "data/categories_2011.txt")))
-      priors <- unname(unlist(read.table(file = "data/pi_2011.txt"))) # これはかわらない. i=1のときのみだから
+      categories <- unname(unlist(read.table(file = "../data/categories_2011.txt")))
+      priors <- unname(unlist(read.table(file = "../data/pi_2011.txt"))) # これはかわらない. i=1のときのみだから
       priors = priors/sum(priors)
       names(priors) = categories
       # SET LANGUAGE
       # ここでAにバイアスをかける
-      A_mat <- as.matrix(read.table(file = "data/alpha_2011.txt"))  # 2つの言語で子音感の遷移はない.
+      A_mat <- as.matrix(read.table(file = "../data/alpha_2011.txt"))  # 2つの言語で子音感の遷移はない.
       bias = params$bias
       # TODO: u/iの位置のハードコーディングをやめる
       if (params$lang=='jpn-u') bias = matrix(rep(c(1, 1, 1+bias, 1, 1, 1), 6), ncol = 6, byrow = TRUE)  # uにバイアス
       if (params$lang=='bpt-i') bias = matrix(rep(c(1, 1, 1, 1, 1, 1+bias), 6), ncol = 6, byrow = TRUE)  # iにバイアス
       A_mat = A_mat * bias
       A_mat = A_mat/rowSums(A_mat)  
-      # stopifnot(near(1, rowSums(A_mat)))
       # SET STANDARD DEVIATION (uやiのかぶり具合)
-      B_params <- as.matrix(read.table(file = "data/b_params_2011.txt", header = TRUE, sep = " "))
+      B_params <- as.matrix(read.table(file = "../data/b_params_2011.txt", header = TRUE, sep = " "))
       # ここで音響モデルの分散を増す(音素の守備範囲を広くする)
       if (params$lang=='jpn-u')  B_params[,'sd'] = B_params[,'sd'] + c(0,0,params$sds,0,0,0)
       if (params$lang=='bpt-i')  B_params[,'sd'] = B_params[,'sd'] + c(0,0,0,0,0,params$sds) 
@@ -86,7 +85,7 @@ Experiment_2 <- R6Class("Experiment",
       Z_hat = unique_seq(self$model$decode(self$obs))
       self$prediction = paste(Z_hat, collapse = "")
       # TODO: self$model$decode(self$obs) も記録. 日本語母語話者で /i/ が挿入されているため
-      # 恐らく 逆向きで認識させて前からバックトレースすれば並列処理はいらなくなる(serialでも再現できる)
+      # TODO: 逆向きで認識させて前からバックトレースすれば並列処理はいらなくなり serialでも再現できる?
       if(self$prediction == "ebuzo") self$epenthesis = "u"
       if(self$prediction == "ebizo") self$epenthesis = "i"
       if(self$prediction == "ebzo") self$epenthesis = "no vowel"

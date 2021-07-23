@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+artifact/*
+*.html
+!artifact/.gitkeep

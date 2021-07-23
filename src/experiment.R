@@ -23,14 +23,14 @@ Experiment <- R6Class("Experiment",
       self$evidence <- 'ebuzo'  # epenthesis ならこっちだけでいい
     },
     make_model = function(params){
-      categories <- unname(unlist(read.table(file = "data/categories.txt")))
-      priors <- unname(unlist(read.table(file = "data/pi.txt")))
+      categories <- unname(unlist(read.table(file = "../data/categories.txt")))
+      priors <- unname(unlist(read.table(file = "../data/pi.txt")))
       names(priors) = categories
       # SET LANGUAGE
-      if (params$lang=='jpn') A_mat <- as.matrix(read.table(file = "data/alpha.txt"))
-      if (params$lang=='fr')  A_mat <- as.matrix(read.table(file = "data/alpha_cc.txt"))
+      if (params$lang=='jpn') A_mat <- as.matrix(read.table(file = "../data/alpha.txt"))
+      if (params$lang=='fr')  A_mat <- as.matrix(read.table(file = "../data/alpha_cc.txt"))
       # SET STANDARD DEVIATION
-      B_params <- as.matrix(read.table(file = "data/b_params.txt", header = TRUE, sep = " "))
+      B_params <- as.matrix(read.table(file = "../data/b_params.txt", header = TRUE, sep = " "))
       B_params[,'sd'] = params$sd
       B_list <- lapply(categories, function(cat) B$new(src = cat, mu = B_params[cat, "mu"], sd = B_params[cat, "sd"]))
       names(B_list) = categories
