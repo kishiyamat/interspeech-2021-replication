@@ -41,11 +41,11 @@ $ docker cp 7609212cd78a:/opt/app/interspeech-2021-replication/artifact/. artifa
 ## Citation
 
 ```bibtex
-@inproceedings{kishiyama2021influence,
-  author={Takeshi Kishiyama},
+@article{kishiyama2021influence,
   title={The Influence of Parallel Processing on Illusory Vowels},
-  pages={N--N},
-  booktitle={INTERSPEECH},
-  year={2021},
+  author={Kishiyama, Takeshi},
+  journal={Proc. Interspeech 2021},
+  pages={1708--1712},
+  year={2021}
 }
 ```
