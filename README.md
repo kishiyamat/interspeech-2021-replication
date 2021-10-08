@@ -1,5 +1,7 @@
 # interspeech-2021-replication
 
+https://www.isca-speech.org/archive/pdfs/interspeech_2021/kishiyama21_interspeech.pdf
+
 ## Prerequisites
 
 - Git
